@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bedrock World Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+  :root {
+    --bg:#0a0c10;--surface:#111520;--surface2:#161c2d;--border:#1e2a42;
+    --accent:#00d4ff;--accent2:#7c3aed;--accent3:#10b981;
+    --warn:#f59e0b;--danger:#ef4444;--text:#e2e8f0;--muted:#64748b;
+    --grid:rgba(0,212,255,0.04);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;min-height:100vh;overflow-x:hidden}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+  body::after{content:'';position:fixed;top:-200px;left:-200px;width:600px;height:600px;background:radial-gradient(circle,rgba(0,212,255,0.06) 0%,transparent 70%);pointer-events:none;z-index:0}
+  .orb2{position:fixed;bottom:-200px;right:-200px;width:700px;height:700px;background:radial-gradient(circle,rgba(124,58,237,0.07) 0%,transparent 70%);pointer-events:none;z-index:0}
+  .container{max-width:1100px;margin:0 auto;padding:2rem;position:relative;z-index:1}
+  header{display:flex;align-items:center;gap:1rem;margin-bottom:3rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border)}
+  .logo{width:44px;height:44px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0}
+  .header-text h1{font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;letter-spacing:-0.02em;line-height:1}
+  .header-text h1 span{color:var(--accent)}
+  .header-text p{font-size:0.7rem;color:var(--muted);margin-top:3px;letter-spacing:0.05em;text-transform:uppercase}
+  .badge{margin-left:auto;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:var(--accent);font-size:0.65rem;padding:4px 10px;border-radius:20px;letter-spacing:0.1em;text-transform:uppercase}
+  .dropzone{border:2px dashed var(--border);border-radius:16px;padding:4rem 2rem;text-align:center;cursor:pointer;transition:all .3s ease;background:var(--surface);position:relative;overflow:hidden}
+  .dropzone::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,212,255,0.03),rgba(124,58,237,0.03));opacity:0;transition:opacity .3s}
+  .dropzone:hover,.dropzone.drag-over{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 0 40px rgba(0,212,255,0.1)}
+  .dropzone:hover::before,.dropzone.drag-over::before{opacity:1}
+  .dropzone .icon{font-size:3rem;margin-bottom:1rem;display:block}
+  .dropzone h2{font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:700;margin-bottom:.5rem}
+  .dropzone p{color:var(--muted);font-size:.8rem;margin-bottom:1.5rem}
+  .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.6rem 1.4rem;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:.8rem;font-weight:600;cursor:pointer;transition:all .2s;border:none;letter-spacing:.02em;text-decoration:none}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),#0099cc);color:#000}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,212,255,0.3)}
+  .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-danger{background:rgba(239,68,68,0.15);color:var(--danger);border:1px solid rgba(239,68,68,0.3)}
+  .btn-danger:hover{background:rgba(239,68,68,0.25)}
+  .btn-success{background:rgba(16,185,129,0.15);color:var(--accent3);border:1px solid rgba(16,185,129,0.3)}
+  .btn-success:hover{background:rgba(16,185,129,0.25)}
+  #fileInput{display:none}
+  .progress-wrap{display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem;text-align:center}
+  .progress-bar-track{background:var(--surface2);border-radius:100px;height:6px;margin:1rem 0;overflow:hidden}
+  .progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:100px;width:0%;transition:width .3s ease;box-shadow:0 0 10px rgba(0,212,255,0.5)}
+  .progress-label{color:var(--muted);font-size:.75rem}
+  #results{display:none}
+  .section-title{font-family:'Syne',sans-serif;font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;margin:2rem 0 1rem;display:flex;align-items:center;gap:.5rem}
+  .section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+  .world-banner{background:linear-gradient(135deg,var(--surface) 0%,var(--surface2) 100%);border:1px solid var(--border);border-radius:16px;padding:1.5rem;display:flex;align-items:center;gap:1.5rem;position:relative;overflow:hidden}
+  .world-banner::before{content:'';position:absolute;top:0;right:0;width:200px;height:100%;background:linear-gradient(90deg,transparent,rgba(0,212,255,0.04))}
+  .world-icon{width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,#2d5a1b,#1a3a0d);display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0;border:1px solid rgba(255,255,255,0.05)}
+  .world-title{font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;letter-spacing:-0.02em}
+  .world-sub{font-size:.7rem;color:var(--muted);margin-top:4px}
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.2rem;transition:all .2s;position:relative;overflow:hidden}
+  .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent-color,var(--accent)),transparent);opacity:.6}
+  .stat-card:hover{border-color:rgba(0,212,255,0.3);transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,0.3)}
+  .stat-label{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem}
+  .stat-value{font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;word-break:break-all}
+  .stat-icon{position:absolute;top:1rem;right:1rem;font-size:1.2rem;opacity:.3}
+  .seed-box{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  .seed-number{font-size:1.8rem;font-weight:700;color:var(--accent);letter-spacing:.05em;font-family:'Syne',sans-serif}
+  .seed-actions{display:flex;gap:.5rem}
+  .player-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.2rem 1.5rem;display:flex;gap:1.5rem;flex-wrap:wrap;align-items:center}
+  .coord-group{display:flex;flex-direction:column;gap:4px}
+  .coord-label{font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+  .coord-val{font-size:1rem;font-weight:600}
+  .coord-val.x{color:#ef4444}.coord-val.y{color:#10b981}.coord-val.z{color:#3b82f6}
+  .files-list{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .file-item{display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;border-bottom:1px solid var(--border);font-size:.75rem;transition:background .15s}
+  .file-item:last-child{border-bottom:none}
+  .file-item:hover{background:var(--surface2)}
+  .file-name{flex:1;color:var(--text)}
+  .file-size{color:var(--muted);font-size:.65rem;min-width:60px;text-align:right}
+  .file-type{font-size:.6rem;padding:2px 6px;border-radius:4px;background:rgba(0,212,255,0.1);color:var(--accent);border:1px solid rgba(0,212,255,0.2);min-width:40px;text-align:center}
+  .file-type.nbt{background:rgba(124,58,237,0.1);color:#a78bfa;border-color:rgba(124,58,237,0.2)}
+  .file-type.db{background:rgba(16,185,129,0.1);color:#6ee7b7;border-color:rgba(16,185,129,0.2)}
+  .file-type.json{background:rgba(245,158,11,0.1);color:#fcd34d;border-color:rgba(245,158,11,0.2)}
+  .file-type.png{background:rgba(239,68,68,0.1);color:#fca5a5;border-color:rgba(239,68,68,0.2)}
+  .tag{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:600;letter-spacing:.05em}
+  .tag-survival{background:rgba(245,158,11,0.15);color:var(--warn);border:1px solid rgba(245,158,11,0.3)}
+  .tag-creative{background:rgba(0,212,255,0.15);color:var(--accent);border:1px solid rgba(0,212,255,0.3)}
+  .tag-adventure{background:rgba(124,58,237,0.15);color:#a78bfa;border:1px solid rgba(124,58,237,0.3)}
+  .tag-spectator{background:rgba(100,116,139,0.15);color:var(--muted);border:1px solid rgba(100,116,139,0.3)}
+  .tag-peaceful{background:rgba(16,185,129,0.15);color:var(--accent3);border:1px solid rgba(16,185,129,0.3)}
+  .tag-easy{background:rgba(245,158,11,0.15);color:var(--warn);border:1px solid rgba(245,158,11,0.3)}
+  .tag-normal{background:rgba(239,68,68,0.15);color:var(--danger);border:1px solid rgba(239,68,68,0.3)}
+  .tag-hard{background:rgba(239,68,68,0.25);color:#ff8888;border:1px solid rgba(239,68,68,0.5)}
+  .error-box{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:12px;padding:1rem 1.5rem;color:#fca5a5;font-size:.8rem;display:none;margin-bottom:1rem}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  .fade-up{animation:fadeUp .4s ease forwards}
+  .stagger-1{animation-delay:.05s;opacity:0}.stagger-2{animation-delay:.10s;opacity:0}
+  .stagger-3{animation-delay:.15s;opacity:0}.stagger-4{animation-delay:.20s;opacity:0}
+  .stagger-5{animation-delay:.25s;opacity:0}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  .pulse{animation:pulse 1.5s ease-in-out infinite}
+  .top-bar{display:flex;justify-content:flex-end;margin-bottom:1rem}
+  .tip{font-size:.65rem;color:var(--muted);margin-top:.5rem}
+  .rule-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.5rem}
+  .rule-item{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.5rem .75rem;font-size:.7rem}
+  .rule-name{color:var(--muted)}
+  .rule-val-true{color:var(--accent3);font-weight:600}
+  .rule-val-false{color:var(--danger);font-weight:600}
+
+  /* ── NBT Editor ── */
+  .nbt-editor{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .nbt-toolbar{display:flex;align-items:center;gap:.5rem;padding:.75rem 1rem;background:var(--surface2);border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .nbt-toolbar-title{font-size:.7rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-right:auto}
+  .nbt-unsaved{display:none;font-size:.65rem;color:var(--warn);background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);padding:3px 8px;border-radius:4px}
+  .nbt-unsaved.show{display:inline-block}
+  .nbt-body{max-height:550px;overflow-y:auto;padding:.5rem}
+  .nbt-body::-webkit-scrollbar{width:4px}
+  .nbt-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+  .nbt-node{margin:1px 0}
+  .nbt-row{display:flex;align-items:center;gap:.4rem;padding:3px 6px;border-radius:6px;transition:background .15s;min-height:32px}
+  .nbt-row:hover{background:rgba(255,255,255,0.03)}
+  .nbt-toggle{width:16px;height:16px;cursor:pointer;color:var(--muted);font-size:.75rem;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:transform .15s;user-select:none}
+  .nbt-toggle.open{transform:rotate(90deg)}
+  .nbt-toggle.leaf{cursor:default;opacity:0}
+  .nbt-type-badge{font-size:.55rem;padding:1px 5px;border-radius:3px;flex-shrink:0;font-weight:700;letter-spacing:.04em;min-width:28px;text-align:center}
+  .tb-byte{background:rgba(192,132,252,0.15);color:#c084fc}.tb-short{background:rgba(192,132,252,0.15);color:#c084fc}
+  .tb-int{background:rgba(251,146,60,0.15);color:#fb923c}.tb-long{background:rgba(251,146,60,0.15);color:#fb923c}
+  .tb-float{background:rgba(59,130,246,0.15);color:#93c5fd}.tb-double{background:rgba(59,130,246,0.15);color:#93c5fd}
+  .tb-str{background:rgba(163,230,53,0.15);color:#a3e635}.tb-list{background:rgba(100,116,139,0.15);color:#94a3b8}
+  .tb-compound{background:rgba(0,212,255,0.1);color:var(--accent)}.tb-barr{background:rgba(239,68,68,0.1);color:#fca5a5}
+  .tb-iarr{background:rgba(239,68,68,0.1);color:#fca5a5}.tb-larr{background:rgba(239,68,68,0.1);color:#fca5a5}
+  .nbt-key-label{color:var(--accent);font-size:.75rem;font-weight:600;flex-shrink:0;cursor:pointer}
+  .nbt-key-label:hover{text-decoration:underline;text-underline-offset:2px}
+  .nbt-colon{color:var(--muted);font-size:.75rem;flex-shrink:0}
+  .nbt-val-display{font-size:.75rem;color:var(--text);flex:1;min-width:0;word-break:break-all}
+  .nbt-val-str{color:#a3e635}.nbt-val-num{color:#fb923c}.nbt-val-bool{color:#c084fc}
+  .nbt-val-muted{color:var(--muted);font-style:italic}
+  .nbt-edit-input{flex:1;background:var(--surface2);border:1px solid var(--accent);border-radius:5px;padding:3px 8px;font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--text);outline:none;min-width:60px}
+  .nbt-edit-input:focus{box-shadow:0 0 0 2px rgba(0,212,255,0.2)}
+  .nbt-edit-input.invalid{border-color:var(--danger);box-shadow:0 0 0 2px rgba(239,68,68,0.2)}
+  .nbt-edit-select{background:var(--surface2);border:1px solid var(--accent);border-radius:5px;padding:3px 6px;font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--text);outline:none;cursor:pointer}
+  .nbt-actions{display:flex;gap:4px;flex-shrink:0;opacity:0;transition:opacity .15s}
+  .nbt-row:hover .nbt-actions{opacity:1}
+  .nbt-btn{width:22px;height:22px;border:none;border-radius:4px;cursor:pointer;font-size:.7rem;display:flex;align-items:center;justify-content:center;transition:all .15s;background:transparent;color:var(--muted)}
+  .nbt-btn:hover{background:var(--surface2);color:var(--text)}
+  .nbt-btn.edit{color:var(--accent)}
+  .nbt-btn.edit:hover{background:rgba(0,212,255,0.1)}
+  .nbt-btn.save{color:var(--accent3)}
+  .nbt-btn.save:hover{background:rgba(16,185,129,0.1)}
+  .nbt-btn.cancel{color:var(--danger)}
+  .nbt-btn.cancel:hover{background:rgba(239,68,68,0.1)}
+  .nbt-btn.del{color:var(--danger)}
+  .nbt-btn.del:hover{background:rgba(239,68,68,0.1)}
+  .nbt-btn.add{color:var(--accent3)}
+  .nbt-btn.add:hover{background:rgba(16,185,129,0.1)}
+  .nbt-children{margin-left:24px;border-left:1px solid var(--border);padding-left:4px}
+  .nbt-children.collapsed{display:none}
+  .nbt-count{font-size:.6rem;color:var(--muted);flex-shrink:0}
+  .nbt-search{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--text);outline:none;width:200px;transition:border-color .2s}
+  .nbt-search:focus{border-color:var(--accent)}
+  .nbt-node.hidden{display:none}
+  .nbt-node.highlight > .nbt-row{background:rgba(0,212,255,0.07);border-radius:6px}
+  .add-field-row{display:flex;gap:.5rem;align-items:center;padding:.75rem 1rem;background:var(--surface2);border-top:1px solid var(--border);flex-wrap:wrap}
+  .add-field-row input,.add-field-row select{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--text);outline:none}
+  .add-field-row input:focus,.add-field-row select:focus{border-color:var(--accent)}
+  .add-field-row input[placeholder="key"]{width:140px}
+  .add-field-row input[placeholder="value"]{flex:1;min-width:100px}
+</style>
+</head>
+<body>
+<div class="orb2"></div>
+<div class="container">
+  <header>
+    <div class="logo">⛏</div>
+    <div class="header-text">
+      <h1>Bedrock <span>World</span> Analyzer</h1>
+      <p>Minecraft Bedrock Edition · .mcworld Inspector</p>
+    </div>
+    <div class="badge">v2.0</div>
+  </header>
+
+  <input type="file" id="fileInput" accept=".mcworld,.zip">
+  <div class="dropzone" id="dropzone">
+    <span class="icon">🌍</span>
+    <h2>Drop your .mcworld file</h2>
+    <p>Supports Minecraft Bedrock Edition export files (.mcworld)</p>
+    <button class="btn btn-primary" id="browseBtn">📂 Browse File</button>
+    <p class="tip" style="margin-top:1rem">Processed entirely in your browser — nothing is uploaded.</p>
+  </div>
+
+  <div class="progress-wrap" id="progressWrap">
+    <div class="pulse" id="progressLabel" style="font-size:.85rem;margin-bottom:.5rem">Reading file...</div>
+    <div class="progress-bar-track"><div class="progress-bar-fill" id="progressBar"></div></div>
+    <div class="progress-label" id="progressSub">Decompressing archive</div>
+  </div>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <div id="results">
+    <div class="top-bar">
+      <button class="btn btn-ghost" onclick="resetTool()">↩ Analyze another world</button>
+    </div>
+
+    <div class="world-banner fade-up stagger-1">
+      <div class="world-icon">🌍</div>
+      <div>
+        <div class="world-title" id="worldName">My World</div>
+        <div class="world-sub" id="worldSub">Bedrock Edition</div>
+      </div>
+    </div>
+
+    <div class="section-title">Core Info</div>
+    <div class="stats-grid fade-up stagger-2" id="coreStats"></div>
+
+    <div class="section-title">Seed</div>
+    <div class="seed-box fade-up stagger-2">
+      <div>
+        <div style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">World Seed</div>
+        <div class="seed-number" id="seedDisplay">—</div>
+      </div>
+      <div class="seed-actions">
+        <button class="btn btn-ghost" id="copySeedBtn" onclick="copySeed()">📋 Copy Seed</button>
+        <a id="chunkbaseLink" class="btn btn-primary" href="#" target="_blank">🗺 Open in Chunkbase</a>
+      </div>
+    </div>
+
+    <div class="section-title">Player Location</div>
+    <div class="player-card fade-up stagger-3" id="playerCard"></div>
+
+    <div class="section-title" id="rulesTitle" style="display:none">Game Rules</div>
+    <div class="rule-grid fade-up stagger-3" id="rulesGrid"></div>
+
+    <!-- NBT EDITOR -->
+    <div class="section-title fade-up stagger-4" style="margin-top:2rem">
+      NBT Editor — level.dat
+      <span id="unsavedBadge" class="nbt-unsaved">● Unsaved changes</span>
+    </div>
+    <div class="nbt-editor fade-up stagger-4">
+      <div class="nbt-toolbar">
+        <span class="nbt-toolbar-title">level.dat</span>
+        <input class="nbt-search" id="nbtSearch" placeholder="🔍 Search keys..." oninput="searchNBT(this.value)">
+        <button class="btn btn-ghost" style="padding:4px 10px;font-size:.7rem" onclick="expandAllNBT()">Expand All</button>
+        <button class="btn btn-ghost" style="padding:4px 10px;font-size:.7rem" onclick="collapseAllNBT()">Collapse All</button>
+        <button class="btn btn-primary" style="padding:6px 14px;font-size:.75rem" onclick="downloadWorld()">💾 Save &amp; Download</button>
+      </div>
+      <div class="nbt-body" id="nbtBody"></div>
+      <div class="add-field-row" id="addFieldRow">
+        <span style="font-size:.7rem;color:var(--muted);flex-shrink:0">Add root field:</span>
+        <input id="addKey" placeholder="key" spellcheck="false">
+        <select id="addType">
+          <option value="byte">Byte</option>
+          <option value="short">Short</option>
+          <option value="int" selected>Int</option>
+          <option value="long">Long</option>
+          <option value="float">Float</option>
+          <option value="double">Double</option>
+          <option value="string">String</option>
+        </select>
+        <input id="addVal" placeholder="value" spellcheck="false" style="flex:1;min-width:80px">
+        <button class="btn btn-success" style="padding:4px 10px;font-size:.7rem" onclick="addRootField()">+ Add</button>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:2rem">Archive Contents</div>
+    <div class="files-list fade-up stagger-5" id="filesList"></div>
+  </div>
+</div>
+
+<script>
+// ── Global state ──────────────────────────────────────────────
+let currentZip = null;
+let currentNBT = null;
+let currentLevelKey = null;
+let currentFileName = '';
+let isDirty = false;
+
+// ── Drop / Browse ─────────────────────────────────────────────
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const browseBtn = document.getElementById('browseBtn');
+
+browseBtn.addEventListener('click', e => { e.stopPropagation(); fileInput.click(); });
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault(); dropzone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0]); });
+
+// ── UI helpers ────────────────────────────────────────────────
+function setProgress(pct, label, sub) {
+  document.getElementById('progressBar').style.width = pct + '%';
+  if (label) document.getElementById('progressLabel').textContent = label;
+  if (sub)   document.getElementById('progressSub').textContent = sub;
+}
+function showError(msg) {
+  const b = document.getElementById('errorBox');
+  b.textContent = '⚠ ' + msg; b.style.display = 'block';
+  document.getElementById('progressWrap').style.display = 'none';
+}
+function resetTool() {
+  dropzone.style.display = 'block';
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('errorBox').style.display = 'none';
+  document.getElementById('progressWrap').style.display = 'none';
+  fileInput.value = '';
+  currentZip = currentNBT = currentLevelKey = null;
+  isDirty = false;
+}
+function markDirty() {
+  isDirty = true;
+  document.getElementById('unsavedBadge').classList.add('show');
+}
+
+// ── File processing ───────────────────────────────────────────
+async function processFile(file) {
+  dropzone.style.display = 'none';
+  document.getElementById('errorBox').style.display = 'none';
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('progressWrap').style.display = 'block';
+  currentFileName = file.name;
+  setProgress(10, 'Reading file...', 'Loading ' + file.name);
+  try {
+    const zip = await JSZip.loadAsync(file);
+    currentZip = zip;
+    setProgress(40, 'Scanning archive...', 'Finding level.dat');
+    const allKeys = Object.keys(zip.files).filter(k => !zip.files[k].dir);
+    const levelKey = allKeys.find(k => k === 'level.dat' || k.endsWith('/level.dat'));
+    if (!levelKey) { showError('No level.dat found. Is this a valid Bedrock .mcworld file?'); return; }
+    currentLevelKey = levelKey;
+    setProgress(60, 'Parsing NBT...', 'Decoding level.dat');
+    const buf = await zip.files[levelKey].async('uint8array');
+    currentNBT = parseBedrockNBT(buf);
+    setProgress(85, 'Loading sizes...', 'Reading archive');
+    const fileSizes = {};
+    for (const name of allKeys) {
+      try { fileSizes[name] = (await zip.files[name].async('uint8array')).length; } catch(e) { fileSizes[name] = 0; }
+    }
+    setProgress(100, 'Done!', 'Rendering');
+    setTimeout(() => {
+      document.getElementById('progressWrap').style.display = 'none';
+      renderResults(currentNBT, allKeys, fileSizes, file.name);
+    }, 250);
+  } catch(err) { showError('Failed to parse: ' + err.message); }
+}
+
+// ── NBT Parser (Bedrock little-endian, 8-byte header) ────────
+function parseBedrockNBT(data) {
+  try { return readCompoundPayload(data, 8).value; }
+  catch(e) { try { return readCompoundPayload(data, 0).value; } catch(e2) { return {}; } }
+}
+
+function readCompoundPayload(data, offset) {
+  const compound = {};
+  while (offset < data.length) {
+    const type = data[offset];
+    if (type === 0) { offset++; break; }
+    const nl = rU16(data, offset+1); offset += 3;
+    const name = rStr(data, offset, nl); offset += nl;
+    const r = readPayload(data, offset, type);
+    compound[name] = { type, value: r.value };
+    offset = r.offset;
+  }
+  return { value: compound, offset };
+}
+
+function readPayload(data, offset, type) {
+  switch(type) {
+    case 1:  return { value: rI8(data,offset),  offset: offset+1 };
+    case 2:  return { value: rI16(data,offset), offset: offset+2 };
+    case 3:  return { value: rI32(data,offset), offset: offset+4 };
+    case 4:  return { value: rI64(data,offset), offset: offset+8 };
+    case 5:  return { value: rF32(data,offset), offset: offset+4 };
+    case 6:  return { value: rF64(data,offset), offset: offset+8 };
+    case 7:  { const len=rI32(data,offset); offset+=4; return { value: {_byteArray:true,data:data.slice(offset,offset+len)}, offset:offset+len }; }
+    case 8:  { const len=rU16(data,offset); offset+=2; return { value: rStr(data,offset,len), offset:offset+len }; }
+    case 9:  {
+      const lt=data[offset++]; const ll=rI32(data,offset); offset+=4;
+      const items=[];
+      for(let i=0;i<ll;i++){const r=readPayload(data,offset,lt);items.push({type:lt,value:r.value});offset=r.offset;}
+      return {value:{_list:true,elemType:lt,items},offset};
+    }
+    case 10: return readCompoundPayload(data,offset);
+    case 11: { const len=rI32(data,offset);offset+=4;const arr=[];for(let i=0;i<len;i++){arr.push(rI32(data,offset));offset+=4;}return{value:{_intArray:true,data:arr},offset}; }
+    case 12: { const len=rI32(data,offset);offset+=4;const arr=[];for(let i=0;i<len;i++){arr.push(rI64(data,offset));offset+=8;}return{value:{_longArray:true,data:arr},offset}; }
+    default: return {value:null,offset};
+  }
+}
+
+function rI8(d,o){const v=d[o];return v>127?v-256:v;}
+function rU16(d,o){return d[o]|(d[o+1]<<8);}
+function rI16(d,o){const v=rU16(d,o);return v>32767?v-65536:v;}
+function rI32(d,o){return(d[o]|d[o+1]<<8|d[o+2]<<16|d[o+3]<<24);}
+function rI64(d,o){return(rI32(d,o+4)*4294967296)+(d[o]|(d[o+1]<<8)|(d[o+2]<<16)|((d[o+3]<<24)>>>0));}
+function rF32(d,o){const b=new ArrayBuffer(4);new Uint8Array(b).set(d.slice(o,o+4));return new DataView(b).getFloat32(0,true);}
+function rF64(d,o){const b=new ArrayBuffer(8);new Uint8Array(b).set(d.slice(o,o+8));return new DataView(b).getFloat64(0,true);}
+function rStr(d,o,len){try{return new TextDecoder().decode(d.slice(o,o+len));}catch(e){return '';}}
+
+// ── NBT Writer ────────────────────────────────────────────────
+function writeBedrockNBT(compound) {
+  const payload = writeCompound(compound);
+  // 8-byte header: version (little-endian int32 = 10) + length (little-endian int32)
+  const header = new Uint8Array(8);
+  const dv = new DataView(header.buffer);
+  dv.setInt32(0, 10, true);
+  dv.setInt32(4, payload.length, true);
+  const out = new Uint8Array(8 + payload.length);
+  out.set(header, 0); out.set(payload, 8);
+  return out;
+}
+
+function writeCompound(compound) {
+  const parts = [];
+  for (const [key, entry] of Object.entries(compound)) {
+    const keyBytes = new TextEncoder().encode(key);
+    const payload = writePayload(entry.type, entry.value);
+    const chunk = new Uint8Array(1 + 2 + keyBytes.length + payload.length);
+    let i = 0;
+    chunk[i++] = entry.type;
+    chunk[i++] = keyBytes.length & 0xff; chunk[i++] = (keyBytes.length >> 8) & 0xff;
+    chunk.set(keyBytes, i); i += keyBytes.length;
+    chunk.set(payload, i);
+    parts.push(chunk);
+  }
+  parts.push(new Uint8Array([0])); // TAG_End
+  return concatU8(parts);
+}
+
+function writePayload(type, value) {
+  const dv = (n) => { const b=new ArrayBuffer(n); return {buf:new Uint8Array(b),dv:new DataView(b)}; };
+  switch(type) {
+    case 1: { const r=dv(1); r.dv.setInt8(0,value); return r.buf; }
+    case 2: { const r=dv(2); r.dv.setInt16(0,value,true); return r.buf; }
+    case 3: { const r=dv(4); r.dv.setInt32(0,value,true); return r.buf; }
+    case 4: {
+      const r=dv(8);
+      const lo = value >>> 0; const hi = Math.floor(value / 4294967296);
+      r.dv.setUint32(0,lo,true); r.dv.setInt32(4,hi,true); return r.buf;
+    }
+    case 5: { const r=dv(4); r.dv.setFloat32(0,value,true); return r.buf; }
+    case 6: { const r=dv(8); r.dv.setFloat64(0,value,true); return r.buf; }
+    case 7: {
+      const arr = value._byteArray ? value.data : new Uint8Array(0);
+      const r=dv(4); r.dv.setInt32(0,arr.length,true);
+      return concatU8([r.buf, arr]);
+    }
+    case 8: {
+      const strBytes = new TextEncoder().encode(String(value));
+      const lenBuf=dv(2); lenBuf.dv.setUint16(0,strBytes.length,true);
+      return concatU8([lenBuf.buf, strBytes]);
+    }
+    case 9: {
+      const list = value._list ? value : {_list:true,elemType:3,items:[]};
+      const header=dv(5); header.dv.setInt8(0,list.elemType); header.dv.setInt32(1,list.items.length,true);
+      const itemParts = list.items.map(item => writePayload(item.type, item.value));
+      return concatU8([header.buf, ...itemParts]);
+    }
+    case 10: return writeCompound(value);
+    case 11: {
+      const arr = value._intArray ? value.data : [];
+      const h=dv(4); h.dv.setInt32(0,arr.length,true);
+      const body=new Uint8Array(arr.length*4);
+      arr.forEach((v,i)=>{const d=new DataView(body.buffer,i*4,4);d.setInt32(0,v,true);});
+      return concatU8([h.buf,body]);
+    }
+    case 12: {
+      const arr = value._longArray ? value.data : [];
+      const h=dv(4); h.dv.setInt32(0,arr.length,true);
+      const body=new Uint8Array(arr.length*8);
+      arr.forEach((v,i)=>{
+        const d=new DataView(body.buffer,i*8,8);
+        d.setUint32(0,v>>>0,true); d.setInt32(4,Math.floor(v/4294967296),true);
+      });
+      return concatU8([h.buf,body]);
+    }
+    default: return new Uint8Array(0);
+  }
+}
+
+function concatU8(arrays) {
+  const total = arrays.reduce((s,a)=>s+a.length,0);
+  const out = new Uint8Array(total); let off=0;
+  for (const a of arrays){out.set(a,off);off+=a.length;}
+  return out;
+}
+
+// ── Download ──────────────────────────────────────────────────
+async function downloadWorld() {
+  if (!currentZip || !currentNBT || !currentLevelKey) return;
+  try {
+    const newLevelDat = writeBedrockNBT(currentNBT);
+    currentZip.file(currentLevelKey, newLevelDat);
+    const blob = await currentZip.generateAsync({type:'blob', compression:'DEFLATE', compressionOptions:{level:6}});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = currentFileName.replace(/\.mcworld$/i,'') + '_edited.mcworld';
+    a.click(); URL.revokeObjectURL(url);
+    isDirty = false;
+    document.getElementById('unsavedBadge').classList.remove('show');
+  } catch(err) { alert('Error saving: ' + err.message); }
+}
+
+// ── Render results ────────────────────────────────────────────
+function renderResults(nbt, allFiles, fileSizes, fileName) {
+  document.getElementById('results').style.display = 'block';
+
+  const g = (k1,k2) => { const v=nbt[k1]??nbt[k2]; return v ? (typeof v==='object'?v.value:v) : undefined; };
+  const gv = k => { const e=nbt[k]; return e!=null ? (typeof e==='object'&&'value'in e ? e.value : e) : undefined; };
+
+  const worldName = gv('LevelName') ?? gv('levelName') ?? fileName.replace(/\.(mcworld|zip)$/i,'');
+  const seed      = gv('RandomSeed') ?? gv('randomSeed') ?? gv('Seed');
+  const gameType  = gv('GameType')   ?? gv('gameType')   ?? 0;
+  const diff      = gv('Difficulty') ?? gv('difficulty') ?? 1;
+  const lastPlayed= gv('LastPlayed') ?? gv('lastPlayed');
+  const spawnX    = gv('SpawnX')     ?? gv('spawnX')     ?? 0;
+  const spawnY    = gv('SpawnY')     ?? gv('spawnY')     ?? 64;
+  const spawnZ    = gv('SpawnZ')     ?? gv('spawnZ')     ?? 0;
+  const cheats    = gv('commandsEnabled') ?? gv('CommandsEnabled');
+  const dayTime   = gv('Time')       ?? gv('DayTime');
+  const version   = gv('lastOpenedWithVersion') ?? gv('StorageVersion');
+  const eduMode   = gv('educationFeaturesEnabled');
+
+  const gameModeLabel = ['Survival','Creative','Adventure','Spectator'][gameType] || 'Unknown';
+  const diffLabel     = ['Peaceful','Easy','Normal','Hard'][diff]      || 'Unknown';
+
+  document.getElementById('worldName').textContent = worldName;
+  document.getElementById('worldSub').innerHTML =
+    `Bedrock Edition &nbsp;<span class="tag tag-${gameModeLabel.toLowerCase()}">${gameModeLabel}</span>&nbsp;<span class="tag tag-${diffLabel.toLowerCase()}">${diffLabel}</span>`;
+
+  const dayNum  = dayTime!=null ? Math.floor(dayTime/24000) : null;
+  const timeStr = dayTime!=null ? formatMCTime((dayTime%24000+24000)%24000) : null;
+
+  const stats = [
+    {label:'Game Mode',value:gameModeLabel,icon:'🎮',color:'var(--accent)'},
+    {label:'Difficulty',value:diffLabel,icon:'⚔',color:'var(--warn)'},
+    {label:'Day Number',value:dayNum!=null?`Day ${dayNum}`:null,icon:'📅',color:'var(--accent3)'},
+    {label:'Time of Day',value:timeStr,icon:'🕐',color:'var(--accent2)'},
+    {label:'Cheats',value:cheats===true||cheats===1?'✓ Enabled':cheats===false||cheats===0?'✗ Disabled':null,icon:'💡',color:cheats?'var(--danger)':'var(--accent3)'},
+    {label:'Storage Version',value:version!=null?'v'+version:null,icon:'📦',color:'var(--muted)'},
+    {label:'Education Edition',value:eduMode===true||eduMode===1?'✓ Yes':eduMode===false||eduMode===0?'✗ No':null,icon:'🎓',color:'var(--warn)'},
+    {label:'Last Played',value:lastPlayed?formatTimestamp(lastPlayed):null,icon:'🕒',color:'var(--muted)'},
+  ].filter(s=>s.value!=null);
+
+  document.getElementById('coreStats').innerHTML = stats.map(s=>`
+    <div class="stat-card" style="--accent-color:${s.color}">
+      <div class="stat-label">${s.label}</div>
+      <div class="stat-value">${s.value}</div>
+      <div class="stat-icon">${s.icon}</div>
+    </div>`).join('');
+
+  document.getElementById('seedDisplay').textContent = seed ?? '—';
+  if (seed!=null) document.getElementById('chunkbaseLink').href=`https://www.chunkbase.com/apps/seed-map#${seed}`;
+  else document.getElementById('chunkbaseLink').style.display='none';
+
+  const pc = document.getElementById('playerCard');
+  const playerEntry = nbt.Player;
+  const playerVal = playerEntry ? playerEntry.value : null;
+  const playerPos = playerVal && playerVal.Pos ? playerVal.Pos.value : null;
+  if (playerPos && playerPos._list && playerPos.items.length >= 3) {
+    const [px,py,pz] = playerPos.items.map(i=>i.value);
+    pc.innerHTML = `<div style="font-size:2rem">🧍</div>
+      <div class="coord-group"><div class="coord-label">X</div><div class="coord-val x">${Math.round(px)}</div></div>
+      <div class="coord-group"><div class="coord-label">Y</div><div class="coord-val y">${Math.round(py)}</div></div>
+      <div class="coord-group"><div class="coord-label">Z</div><div class="coord-val z">${Math.round(pz)}</div></div>
+      <div style="margin-left:auto;font-size:.7rem;color:var(--muted)">Last known player position</div>`;
+  } else {
+    pc.innerHTML = `<div style="font-size:2rem">📍</div>
+      <div class="coord-group"><div class="coord-label">World Spawn</div>
+        <div style="font-size:.9rem;font-weight:600;margin-top:4px">
+          <span class="coord-val x">${spawnX}</span>&nbsp;
+          <span class="coord-val y">${spawnY}</span>&nbsp;
+          <span class="coord-val z">${spawnZ}</span>
+        </div>
+      </div>
+      <div style="margin-left:auto;font-size:.7rem;color:var(--muted)">World spawn (no player data)</div>`;
+  }
+
+  const ruleKeys = Object.keys(nbt).filter(k => {
+    const v = nbt[k]; const val = typeof v==='object'&&'value'in v?v.value:v;
+    return (val===true||val===false||val===0||val===1) &&
+           /^(do|keep|natural|mob|show|send|pvp|fire|tnt|fall|drowning|freeze|storm|spawn|insomnia|immediate)/i.test(k);
+  });
+  if (ruleKeys.length>0) {
+    document.getElementById('rulesTitle').style.display='flex';
+    document.getElementById('rulesGrid').innerHTML = ruleKeys.map(k=>{
+      const v=nbt[k];const val=typeof v==='object'&&'value'in v?v.value:v;
+      const isTrue=val===true||val===1;
+      return `<div class="rule-item"><span class="rule-name">${k}</span><span class="${isTrue?'rule-val-true':'rule-val-false'}">${isTrue?'true':'false'}</span></div>`;
+    }).join('');
+  }
+
+  renderNBTEditor(nbt);
+
+  const sortedFiles = allFiles.filter(f=>!f.endsWith('/')).sort().slice(0,80);
+  document.getElementById('filesList').innerHTML = sortedFiles.map(f=>{
+    const size=fileSizes[f]!=null?formatBytes(fileSizes[f]):'—';
+    const ext=f.split('.').pop().toLowerCase();
+    let cls='';
+    if(['dat','nbt'].includes(ext))cls='nbt';
+    else if(['ldb','log','manifest','current','lock'].includes(ext))cls='db';
+    else if(ext==='json')cls='json';
+    else if(['png','tga'].includes(ext))cls='png';
+    return `<div class="file-item"><span class="file-type ${cls}">${ext.toUpperCase()}</span><span class="file-name">${esc(f)}</span><span class="file-size">${size}</span></div>`;
+  }).join('')+(allFiles.length>80?`<div class="file-item" style="color:var(--muted);justify-content:center;font-size:.7rem">...and ${allFiles.length-80} more</div>`:'');
+}
+
+// ── NBT Editor Renderer ───────────────────────────────────────
+const TYPE_NAMES = {1:'BYTE',2:'SHORT',3:'INT',4:'LONG',5:'FLOAT',6:'DOUBLE',7:'BARR',8:'STR',9:'LIST',10:'COMP',11:'IARR',12:'LARR'};
+const TYPE_CSS   = {1:'byte',2:'short',3:'int',4:'long',5:'float',6:'double',7:'barr',8:'str',9:'list',10:'compound',11:'iarr',12:'larr'};
+
+function renderNBTEditor(compound) {
+  const body = document.getElementById('nbtBody');
+  body.innerHTML = '';
+  body.appendChild(buildCompoundNodes(compound, []));
+}
+
+function buildCompoundNodes(compound, path) {
+  const frag = document.createDocumentFragment();
+  for (const [key, entry] of Object.entries(compound)) {
+    frag.appendChild(buildNode(key, entry, [...path, key]));
+  }
+  return frag;
+}
+
+function buildNode(key, entry, path) {
+  const type  = entry.type;
+  const value = entry.value;
+  const node  = document.createElement('div');
+  node.className = 'nbt-node';
+  node.dataset.path = JSON.stringify(path);
+
+  const isCompound = type === 10;
+  const isList     = type === 9;
+  const isComplex  = isCompound || isList || type === 7 || type === 11 || type === 12;
+
+  // Row
+  const row = document.createElement('div');
+  row.className = 'nbt-row';
+
+  // Toggle
+  const toggle = document.createElement('span');
+  toggle.className = isComplex ? 'nbt-toggle' : 'nbt-toggle leaf';
+  toggle.textContent = '▶';
+  if (isComplex) {
+    toggle.addEventListener('click', () => {
+      const children = node.querySelector('.nbt-children');
+      if (!children) return;
+      const collapsed = children.classList.toggle('collapsed');
+      toggle.classList.toggle('open', !collapsed);
+    });
+  }
+  row.appendChild(toggle);
+
+  // Type badge
+  const badge = document.createElement('span');
+  badge.className = `nbt-type-badge tb-${TYPE_CSS[type]||'str'}`;
+  badge.textContent = TYPE_NAMES[type] || '?';
+  row.appendChild(badge);
+
+  // Key label
+  const keyEl = document.createElement('span');
+  keyEl.className = 'nbt-key-label';
+  keyEl.textContent = key;
+  keyEl.title = 'Click to rename';
+  keyEl.addEventListener('click', () => startRenameKey(keyEl, path));
+  row.appendChild(keyEl);
+
+  const colon = document.createElement('span');
+  colon.className = 'nbt-colon';
+  colon.textContent = ':';
+  row.appendChild(colon);
+
+  // Value display
+  const valEl = document.createElement('span');
+  valEl.className = 'nbt-val-display';
+  valEl.innerHTML = formatValueDisplay(type, value);
+  row.appendChild(valEl);
+
+  // Actions
+  const actions = document.createElement('span');
+  actions.className = 'nbt-actions';
+
+  if (!isComplex) {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'nbt-btn edit'; editBtn.title = 'Edit value'; editBtn.textContent = '✏';
+    editBtn.addEventListener('click', e => { e.stopPropagation(); startEditValue(row, valEl, actions, path, type, value); });
+    actions.appendChild(editBtn);
+  }
+
+  if (isCompound) {
+    const addBtn = document.createElement('button');
+    addBtn.className = 'nbt-btn add'; addBtn.title = 'Add field'; addBtn.textContent = '+';
+    addBtn.addEventListener('click', e => { e.stopPropagation(); showAddFieldPanel(node, path); });
+    actions.appendChild(addBtn);
+  }
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'nbt-btn del'; delBtn.title = 'Delete'; delBtn.textContent = '🗑';
+  delBtn.addEventListener('click', e => { e.stopPropagation(); deleteNode(path); });
+  actions.appendChild(delBtn);
+
+  row.appendChild(actions);
+  node.appendChild(row);
+
+  // Children
+  if (isComplex) {
+    const children = document.createElement('div');
+    children.className = 'nbt-children collapsed';
+
+    if (isCompound) {
+      children.appendChild(buildCompoundNodes(value, path));
+    } else if (isList && value._list) {
+      const countEl = document.createElement('span');
+      countEl.className = 'nbt-count';
+      valEl.innerHTML = `<span class="nbt-val-muted">[List · ${value.items.length} items]</span>`;
+      value.items.forEach((item, idx) => {
+        children.appendChild(buildNode(`[${idx}]`, item, [...path, idx]));
+      });
+    } else {
+      const pre = document.createElement('div');
+      pre.style.cssText = 'padding:.5rem 1rem;font-size:.7rem;color:var(--muted)';
+      pre.textContent = formatValueDisplay(type, value);
+      children.appendChild(pre);
+    }
+
+    node.appendChild(children);
+  }
+
+  return node;
+}
+
+function formatValueDisplay(type, value) {
+  if (value === null || value === undefined) return '<span class="nbt-val-muted">null</span>';
+  switch(type) {
+    case 1: case 2: case 3: case 4:
+      return `<span class="nbt-val-num">${value}</span>`;
+    case 5: case 6:
+      return `<span class="nbt-val-num">${typeof value==='number'?value.toFixed(6).replace(/\.?0+$/,''):value}</span>`;
+    case 8:
+      return `<span class="nbt-val-str">"${esc(String(value))}"</span>`;
+    case 10: {
+      const count = Object.keys(value).length;
+      return `<span class="nbt-val-muted">{Compound · ${count} field${count!==1?'s':''}}</span>`;
+    }
+    case 9:
+      return value._list
+        ? `<span class="nbt-val-muted">[List · ${value.items.length} items]</span>`
+        : `<span class="nbt-val-muted">[List]</span>`;
+    case 7:
+      return `<span class="nbt-val-muted">[ByteArray · ${value._byteArray?value.data.length:0} bytes]</span>`;
+    case 11:
+      return `<span class="nbt-val-muted">[IntArray · ${value._intArray?value.data.length:0} ints]</span>`;
+    case 12:
+      return `<span class="nbt-val-muted">[LongArray · ${value._longArray?value.data.length:0} longs]</span>`;
+    default:
+      return `<span class="nbt-val-muted">${esc(String(value))}</span>`;
+  }
+}
+
+// ── Inline value editing ──────────────────────────────────────
+function startEditValue(row, valEl, actions, path, type, currentValue) {
+  // Replace value display with input
+  valEl.innerHTML = '';
+  let input;
+
+  if (type === 1) {
+    // Byte — show as boolean toggle for common cases
+    input = document.createElement('select');
+    input.className = 'nbt-edit-select';
+    input.innerHTML = '<option value="1">1 (true)</option><option value="0">0 (false)</option>';
+    input.value = currentValue ? '1' : '0';
+  } else {
+    input = document.createElement('input');
+    input.className = 'nbt-edit-input';
+    input.value = type === 8 ? currentValue : String(currentValue);
+    input.spellcheck = false;
+    input.placeholder = TYPE_NAMES[type];
+    input.addEventListener('input', () => validateInput(input, type));
+  }
+
+  valEl.appendChild(input);
+  if (input.tagName === 'INPUT') input.focus(); else input.focus();
+
+  // Replace action buttons with save/cancel
+  actions.innerHTML = '';
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'nbt-btn save'; saveBtn.textContent = '✓'; saveBtn.title = 'Save';
+  saveBtn.addEventListener('click', e => { e.stopPropagation(); commitEdit(path, type, input, valEl, actions, currentValue); });
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'nbt-btn cancel'; cancelBtn.textContent = '✕'; cancelBtn.title = 'Cancel';
+  cancelBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    valEl.innerHTML = formatValueDisplay(type, currentValue);
+    rebuildActions(actions, path, type, currentValue, row, valEl);
+  });
+
+  actions.appendChild(saveBtn);
+  actions.appendChild(cancelBtn);
+
+  if (input.tagName === 'INPUT') {
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') saveBtn.click();
+      if (e.key === 'Escape') cancelBtn.click();
+    });
+  }
+}
+
+function validateInput(input, type) {
+  let valid = true;
+  const v = input.value.trim();
+  if ([1,2,3,4,11,12].includes(type)) valid = /^-?\d+$/.test(v);
+  if ([5,6].includes(type)) valid = !isNaN(parseFloat(v));
+  input.classList.toggle('invalid', !valid);
+}
+
+function parseTypedValue(type, rawStr) {
+  const v = rawStr.trim();
+  if ([1,2,3,4].includes(type)) return parseInt(v, 10);
+  if ([5,6].includes(type)) return parseFloat(v);
+  if (type === 8) return rawStr;
+  return rawStr;
+}
+
+function commitEdit(path, type, input, valEl, actions, oldValue) {
+  const raw = input.tagName === 'SELECT' ? input.value : input.value;
+  if (input.classList && input.classList.contains('invalid')) return;
+  const newValue = parseTypedValue(type, raw);
+  setNBTValue(path, newValue);
+  valEl.innerHTML = formatValueDisplay(type, newValue);
+  rebuildActions(actions, path, type, newValue, null, valEl);
+  markDirty();
+}
+
+function rebuildActions(actions, path, type, value, row, valEl) {
+  actions.innerHTML = '';
+  const isComplex = [7,9,10,11,12].includes(type);
+  if (!isComplex) {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'nbt-btn edit'; editBtn.textContent = '✏'; editBtn.title = 'Edit value';
+    editBtn.addEventListener('click', e => { e.stopPropagation(); startEditValue(valEl.closest('.nbt-row'), valEl, actions, path, type, value); });
+    actions.appendChild(editBtn);
+  }
+  const delBtn = document.createElement('button');
+  delBtn.className = 'nbt-btn del'; delBtn.textContent = '🗑'; delBtn.title = 'Delete';
+  delBtn.addEventListener('click', e => { e.stopPropagation(); deleteNode(path); });
+  actions.appendChild(delBtn);
+}
+
+// ── Key renaming ──────────────────────────────────────────────
+function startRenameKey(keyEl, path) {
+  const oldKey = path[path.length - 1];
+  if (typeof oldKey !== 'string') return; // don't rename list indices
+  const input = document.createElement('input');
+  input.className = 'nbt-edit-input';
+  input.value = oldKey; input.style.width = '120px'; input.spellcheck = false;
+  keyEl.replaceWith(input); input.focus(); input.select();
+
+  const commit = () => {
+    const newKey = input.value.trim();
+    if (!newKey || newKey === oldKey) { input.replaceWith(keyEl); return; }
+    renameNBTKey(path, newKey);
+    keyEl.textContent = newKey;
+    input.replaceWith(keyEl);
+    markDirty();
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e => { if(e.key==='Enter')commit(); if(e.key==='Escape'){input.replaceWith(keyEl);} });
+}
+
+// ── NBT mutation helpers ──────────────────────────────────────
+function getNBTParent(path) {
+  let current = currentNBT;
+  for (let i = 0; i < path.length - 1; i++) {
+    const k = path[i];
+    const entry = current[k];
+    if (!entry) return null;
+    const val = typeof entry === 'object' && 'value' in entry ? entry.value : entry;
+    if (val && val._list) current = val.items.reduce((o,item,idx)=>({...o,[idx]:item}),{});
+    else current = val;
+  }
+  return current;
+}
+
+function setNBTValue(path, newValue) {
+  let current = currentNBT;
+  for (let i = 0; i < path.length - 1; i++) {
+    const k = path[i];
+    const entry = current[k];
+    current = typeof entry==='object'&&'value'in entry ? entry.value : entry;
+  }
+  const lastKey = path[path.length-1];
+  if (current[lastKey]) current[lastKey].value = newValue;
+}
+
+function renameNBTKey(path, newKey) {
+  let parent = currentNBT;
+  for (let i = 0; i < path.length - 1; i++) {
+    const k = path[i];
+    const e = parent[k];
+    parent = typeof e==='object'&&'value'in e ? e.value : e;
+  }
+  const oldKey = path[path.length-1];
+  const entry = parent[oldKey];
+  const newParent = {};
+  for (const [k,v] of Object.entries(parent)) {
+    newParent[k===oldKey?newKey:k] = v;
+  }
+  Object.keys(parent).forEach(k=>delete parent[k]);
+  Object.assign(parent, newParent);
+}
+
+function deleteNode(path) {
+  if (!confirm(`Delete "${path[path.length-1]}"?`)) return;
+  let parent = currentNBT;
+  for (let i = 0; i < path.length - 1; i++) {
+    const k = path[i]; const e = parent[k];
+    parent = typeof e==='object'&&'value'in e ? e.value : e;
+  }
+  delete parent[path[path.length-1]];
+  markDirty();
+  renderNBTEditor(currentNBT);
+}
+
+// ── Add field panel ───────────────────────────────────────────
+function showAddFieldPanel(node, path) {
+  const existing = node.querySelector('.add-field-panel');
+  if (existing) { existing.remove(); return; }
+  const panel = document.createElement('div');
+  panel.className = 'add-field-row add-field-panel';
+  panel.style.marginLeft = '24px';
+  panel.innerHTML = `
+    <span style="font-size:.7rem;color:var(--muted)">Add field:</span>
+    <input placeholder="key" spellcheck="false" style="width:120px">
+    <select>
+      <option value="1">Byte</option><option value="2">Short</option>
+      <option value="3" selected>Int</option><option value="4">Long</option>
+      <option value="5">Float</option><option value="6">Double</option>
+      <option value="8">String</option>
+    </select>
+    <input placeholder="value" spellcheck="false" style="flex:1;min-width:80px">
+    <button class="btn btn-success" style="padding:4px 10px;font-size:.7rem">+ Add</button>
+    <button class="btn btn-ghost" style="padding:4px 10px;font-size:.7rem">✕</button>
+  `;
+  const [, keyIn, typeSelect, valIn, addBtn, cancelBtn] = panel.children;
+  cancelBtn.addEventListener('click', () => panel.remove());
+  addBtn.addEventListener('click', () => {
+    const key = keyIn.value.trim(); const type = parseInt(typeSelect.value);
+    const rawVal = valIn.value;
+    if (!key) { keyIn.style.borderColor='var(--danger)'; return; }
+    let value = parseTypedValue(type, rawVal);
+    if (type === 8 && !rawVal) value = '';
+
+    let target = currentNBT;
+    for (const k of path) {
+      const e = target[k];
+      target = typeof e==='object'&&'value'in e ? e.value : e;
+    }
+    target[key] = { type, value };
+    markDirty(); panel.remove();
+    renderNBTEditor(currentNBT);
+  });
+  const children = node.querySelector('.nbt-children');
+  if (children) children.appendChild(panel);
+  else node.appendChild(panel);
+  keyIn.focus();
+}
+
+function addRootField() {
+  const key = document.getElementById('addKey').value.trim();
+  const type = parseInt(document.getElementById('addType').value);
+  const rawVal = document.getElementById('addVal').value;
+  if (!key) { document.getElementById('addKey').style.borderColor='var(--danger)'; return; }
+  let value = parseTypedValue(type, rawVal);
+  if (type === 8 && !rawVal) value = '';
+  currentNBT[key] = { type, value };
+  document.getElementById('addKey').value = '';
+  document.getElementById('addVal').value = '';
+  markDirty();
+  renderNBTEditor(currentNBT);
+}
+
+// ── Search ────────────────────────────────────────────────────
+function searchNBT(query) {
+  const q = query.toLowerCase().trim();
+  document.querySelectorAll('#nbtBody .nbt-node').forEach(node => {
+    const path = JSON.parse(node.dataset.path || '[]');
+    const key = String(path[path.length-1]).toLowerCase();
+    if (!q) { node.classList.remove('hidden','highlight'); return; }
+    if (key.includes(q)) { node.classList.remove('hidden'); node.classList.add('highlight'); }
+    else { node.classList.add('hidden'); node.classList.remove('highlight'); }
+  });
+}
+
+function expandAllNBT() {
+  document.querySelectorAll('.nbt-children').forEach(c=>c.classList.remove('collapsed'));
+  document.querySelectorAll('.nbt-toggle:not(.leaf)').forEach(t=>t.classList.add('open'));
+}
+function collapseAllNBT() {
+  document.querySelectorAll('.nbt-children').forEach(c=>c.classList.add('collapsed'));
+  document.querySelectorAll('.nbt-toggle:not(.leaf)').forEach(t=>t.classList.remove('open'));
+}
+
+// ── Utilities ─────────────────────────────────────────────────
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function formatBytes(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(2)+' MB';}
+function formatTimestamp(ts){try{const ms=ts>1e10?ts*1000:ts;return new Date(ms).toLocaleString();}catch(e){return ts;}}
+function formatMCTime(t){const h=Math.floor((t/24000*24+6)%24);const m=Math.floor((t%1000)/1000*60);const ap=h>=12?'PM':'AM';return `${h%12||12}:${String(m).padStart(2,'0')} ${ap}`;}
+function copySeed(){
+  const seed=document.getElementById('seedDisplay').textContent;
+  navigator.clipboard.writeText(seed).then(()=>{
+    const btn=document.getElementById('copySeedBtn');
+    btn.textContent='✓ Copied!';
+    setTimeout(()=>btn.textContent='📋 Copy Seed',1500);
+  });
+}
+</script>
+</body>
+</html>
